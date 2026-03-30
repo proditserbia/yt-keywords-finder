@@ -1,0 +1,7 @@
+# YT Keywords Finder – Python dependencies
+#
+# Install with:  pip install -r requirements.txt
+
+# YouTube data extraction (search + metadata)
+# Minimum version 2026.03.07 to avoid CVE for --netrc-cmd injection (GHSA-...)
+yt-dlp>=2026.03.07
