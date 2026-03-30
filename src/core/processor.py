@@ -12,6 +12,8 @@ To add Vimeo support:
        instantiate the appropriate service.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import threading
