@@ -3,5 +3,8 @@
 # Install with:  pip install -r requirements.txt
 
 # YouTube data extraction (search + metadata)
-# Minimum version 2026.03.07 to avoid CVE for --netrc-cmd injection (GHSA-...)
-yt-dlp>=2026.03.07
+# 2025.10.14 is the last release that supports Python 3.9; versions from
+# 2025.10.15 onward require Python >=3.10.
+# Note: if you use the --netrc-cmd option, upgrade to Python >=3.10 and
+# install yt-dlp>=2026.03.07 to avoid the --netrc-cmd injection CVE (GHSA-...).
+yt-dlp>=2025.10.14
