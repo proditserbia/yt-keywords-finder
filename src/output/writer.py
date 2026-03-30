@@ -5,6 +5,8 @@ Each function is independent and raises on genuine I/O errors so callers
 (the core processor) can log and continue processing other keywords.
 """
 
+from __future__ import annotations
+
 import csv
 import logging
 import os
