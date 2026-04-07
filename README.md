@@ -81,6 +81,24 @@ python app.py --mode cli \
 
 # Enable verbose (debug) logging
 python app.py --mode cli --keywords "fashion" --verbose
+
+# Search + download: videos > 1 hour long, published in the last year
+python app.py --mode cli \
+              --keywords "documentary nature,space exploration" \
+              --max-results 5 \
+              --min-duration 60 \
+              --published-within-days 365 \
+              --download \
+              --download-dir ./videos
+
+# Search + download with a keywords file
+python app.py --mode cli \
+              --keywords-file keywords.txt \
+              --max-results 10 \
+              --min-duration 60 \
+              --published-within-days 365 \
+              --download \
+              --download-dir ./videos
 ```
 
 ### CLI flags
@@ -92,9 +110,12 @@ python app.py --mode cli --keywords "fashion" --verbose
 | `--keywords-file` | — | Path to plain-text keywords file |
 | `--max-results` | `50` | Max valid URLs per keyword |
 | `--min-duration` | `0` | Min video duration in minutes (0 = no filter) |
-| `--output` | `./results` | Output directory |
+| `--published-within-days` | `None` | Only include videos published within the last N days (e.g. `365`) |
+| `--output` | `./results` | Output directory for URL lists / CSV |
 | `--no-csv` | off | Disable CSV summary |
 | `--no-combined-txt` | off | Disable `all_keywords.txt` |
+| `--download` | off | Download matching videos after collecting URLs |
+| `--download-dir` | `./downloads` | Root folder for downloads; one sub-folder per keyword |
 | `--verbose` | off | DEBUG-level console logging |
 
 ---
@@ -126,6 +147,18 @@ For each keyword, one file is created in the output folder:
 | `all_keywords.txt` | All URLs from all keywords combined |
 | `all_keywords_summary.csv` | Full metadata: keyword, title, url, duration, channel |
 | `yt_finder.log` | Full debug log |
+
+When `--download` is used, videos are saved under `--download-dir`:
+
+```
+downloads/
+└── <keyword>/
+    ├── <title> [<video_id>].mp4
+    └── .download_history.json   # duplicate-guard sidecar (auto-generated)
+```
+
+The `.download_history.json` sidecar is read on every run so that re-running
+the same keyword never re-downloads a video already on disk.
 
 ---
 

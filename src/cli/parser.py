@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 from src.config.constants import (
+    DEFAULT_DOWNLOAD_DIR,
     DEFAULT_MAX_RESULTS,
     DEFAULT_MIN_DURATION,
     DEFAULT_OUTPUT_DIR,
@@ -34,12 +35,22 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="yt-keywords-finder",
-        description="Search YouTube by keyword and save matching video URLs to text files.",
+        description=(
+            "Search YouTube by keyword and save matching video URLs to text files. "
+            "Optionally download the matching videos with --download."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 examples:
-  python app.py --mode cli --keywords "fashion street,runway,summer outfits" \\
-                --max-results 100 --min-duration 5 --output ./results
+  # Search only – collect up to 10 results per keyword from the last year
+  python app.py --mode cli --keywords "fashion street,runway" \\
+                --max-results 10 --min-duration 5 --output ./results
+
+  # Search + download videos longer than 60 minutes published in the last year
+  python app.py --mode cli --keywords "documentary nature" \\
+                --max-results 5 --min-duration 60 \\
+                --published-within-days 365 \\
+                --download --download-dir ./videos
 
   python app.py --mode cli --keywords-file keywords.txt \\
                 --max-results 50  --min-duration 3  --output ./results
@@ -81,6 +92,17 @@ examples:
         metavar="MINUTES",
         help=f"Minimum video duration in minutes (default: {DEFAULT_MIN_DURATION} = no filter).",
     )
+    parser.add_argument(
+        "--published-within-days",
+        type=int,
+        default=None,
+        metavar="DAYS",
+        help=(
+            "Only include videos published within the last N days "
+            "(e.g. 365 for one year, 90 for last 3 months). "
+            "Default: no date filter."
+        ),
+    )
 
     # ── Output options ───────────────────────────────────────────────────────
     parser.add_argument(
@@ -98,6 +120,25 @@ examples:
         "--no-combined-txt",
         action="store_true",
         help="Disable writing all_keywords.txt combined file.",
+    )
+
+    # ── Download options ─────────────────────────────────────────────────────
+    parser.add_argument(
+        "--download",
+        action="store_true",
+        help=(
+            "Download each matching video after the search/filter phase. "
+            "Videos are saved to sub-folders of --download-dir named after each keyword."
+        ),
+    )
+    parser.add_argument(
+        "--download-dir",
+        default=DEFAULT_DOWNLOAD_DIR,
+        metavar="DIR",
+        help=(
+            f"Root directory for downloaded videos (default: {DEFAULT_DOWNLOAD_DIR}). "
+            "A sub-folder is created per keyword."
+        ),
     )
 
     # ── Misc ─────────────────────────────────────────────────────────────────
@@ -173,4 +214,7 @@ def run_cli(args: argparse.Namespace) -> None:
         output_dir=args.output,
         create_csv=not args.no_csv,
         create_combined_txt=not args.no_combined_txt,
+        download_videos=args.download,
+        download_dir=args.download_dir,
+        published_within_days=args.published_within_days,
     )

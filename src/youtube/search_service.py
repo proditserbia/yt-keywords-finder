@@ -9,6 +9,7 @@ it out (or adding a parallel Vimeo service) requires changes only here and in
 import logging
 import threading
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Generator, Optional
 
 import yt_dlp
@@ -46,6 +47,7 @@ class YouTubeSearchService:
         keyword: str,
         max_results: int,
         min_duration_seconds: float = 0.0,
+        published_within_days: Optional[int] = None,
         cancel_flag: Optional[threading.Event] = None,
         progress_callback: Optional[Callable[[str], None]] = None,
     ) -> Generator[VideoInfo, None, None]:
@@ -58,6 +60,9 @@ class YouTubeSearchService:
             keyword: Search term to query YouTube with.
             max_results: Maximum number of valid results to yield.
             min_duration_seconds: Minimum video duration in seconds (0 = no filter).
+            published_within_days: When set, only videos uploaded within the last
+                N days are included.  Uses the ``timestamp`` field returned by the
+                flat search extraction; entries without a timestamp pass through.
             cancel_flag: Optional :class:`threading.Event`.  When set, the
                 generator stops early so GUI/CLI runs can be cancelled.
             progress_callback: Optional callable ``(message: str) -> None``
@@ -118,6 +123,23 @@ class YouTubeSearchService:
             if video_id in seen_ids:
                 continue
             seen_ids.add(video_id)
+
+            # Date filter – uses the Unix timestamp returned by flat extraction.
+            # If the field is absent, the video passes through (best-effort filter).
+            if published_within_days is not None and published_within_days > 0:
+                timestamp: Optional[float] = entry.get("timestamp")
+                if timestamp is not None:
+                    cutoff = (
+                        datetime.now(tz=timezone.utc) - timedelta(days=published_within_days)
+                    ).timestamp()
+                    if timestamp < cutoff:
+                        logger.debug(
+                            "Skipped '%s' (timestamp %s before %d-day cutoff)",
+                            entry.get("title", ""),
+                            timestamp,
+                            published_within_days,
+                        )
+                        continue
 
             # Build canonical video URL
             url = entry.get("url") or f"https://www.youtube.com/watch?v={video_id}"
