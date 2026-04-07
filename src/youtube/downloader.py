@@ -21,6 +21,7 @@ from typing import Callable, Optional
 import yt_dlp
 
 from src.config.constants import DOWNLOAD_HISTORY_FILENAME
+from src.transport.session import SessionConfig
 from src.youtube.search_service import VideoInfo
 
 logger = logging.getLogger(__name__)
@@ -38,16 +39,20 @@ class VideoDownloader:
         log_callback: Optional ``(message: str) -> None`` called for every
             progress message.  Uses the same interface as
             :func:`~src.core.processor.process_keywords`.
+        session: Optional :class:`~src.transport.session.SessionConfig`
+            carrying cookies and proxy settings.
     """
 
     def __init__(
         self,
         download_dir: Path,
         log_callback: Optional[Callable[[str], None]] = None,
+        session: Optional[SessionConfig] = None,
     ) -> None:
         self._dir = Path(download_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
         self._log_callback = log_callback
+        self._session = session or SessionConfig()
         self._history_path = self._dir / DOWNLOAD_HISTORY_FILENAME
         self._history: set[str] = self._load_history()
 
@@ -122,6 +127,7 @@ class VideoDownloader:
             "ignoreerrors": True,
             "noprogress": True,
         }
+        ydl_opts.update(self._session.as_ydl_opts())
 
         self._log(f"  Downloading: {video.title!r} → {self._dir.name}/")
         try:

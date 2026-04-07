@@ -23,6 +23,7 @@ from src.config.constants import (
 )
 from src.core.processor import process_keywords, setup_logging
 from src.filters.validators import parse_keywords
+from src.transport.session import SessionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,11 @@ examples:
                 --max-results 5 --min-duration 60 \\
                 --published-within-days 365 \\
                 --download --download-dir ./videos
+
+  # Use a cookies file and SOCKS5 proxy
+  python app.py --mode cli --keywords "documentary" \\
+                --cookies-file cookies.txt --proxy socks5://127.0.0.1:1080 \\
+                --max-results 5 --min-duration 60 --download
 
   python app.py --mode cli --keywords-file keywords.txt \\
                 --max-results 50  --min-duration 3  --output ./results
@@ -141,6 +147,28 @@ examples:
         ),
     )
 
+    # ── Transport options (cookies + proxy) ─────────────────────────────────
+    parser.add_argument(
+        "--cookies-file",
+        default=None,
+        metavar="FILE",
+        help=(
+            "Path to a Netscape-format cookies.txt file (e.g. exported by "
+            "a browser extension).  Passed directly to yt-dlp.  "
+            "Useful when YouTube restricts access from data-center IPs."
+        ),
+    )
+    parser.add_argument(
+        "--proxy",
+        default=None,
+        metavar="URL",
+        help=(
+            "Proxy URL for all network traffic, e.g. "
+            "'http://host:port' or 'socks5://host:port'.  "
+            "Omit (or leave blank) for a direct connection."
+        ),
+    )
+
     # ── Misc ─────────────────────────────────────────────────────────────────
     parser.add_argument(
         "--verbose",
@@ -217,4 +245,8 @@ def run_cli(args: argparse.Namespace) -> None:
         download_videos=args.download,
         download_dir=args.download_dir,
         published_within_days=args.published_within_days,
+        session=SessionConfig(
+            cookies_file=args.cookies_file,
+            proxy=args.proxy,
+        ),
     )

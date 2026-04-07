@@ -1,5 +1,5 @@
 """
-Output writers for TXT and CSV result files.
+Output writers for TXT, CSV, and JSON result files.
 
 Each function is independent and raises on genuine I/O errors so callers
 (the core processor) can log and continue processing other keywords.
@@ -8,6 +8,7 @@ Each function is independent and raises on genuine I/O errors so callers
 from __future__ import annotations
 
 import csv
+import json
 import logging
 import os
 from pathlib import Path
@@ -89,3 +90,20 @@ def save_csv(filepath: str | Path, rows: list[dict], mode: str = "a") -> None:
         writer.writerows(rows)
 
     logger.info("Saved %d row(s) to CSV %s", len(rows), path)
+
+
+def save_json(filepath: str | Path, rows: list[dict]) -> None:
+    """Write *rows* as a JSON array to *filepath*.
+
+    Existing content is overwritten.  This provides a structured alternative
+    to the CSV summary and is useful for programmatic consumption of results.
+
+    Args:
+        filepath: Destination JSON file path.
+        rows: List of dicts (same data as used for the CSV).
+    """
+    path = Path(filepath)
+    with path.open("w", encoding="utf-8") as fh:
+        json.dump(rows, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    logger.info("Saved %d row(s) to JSON %s", len(rows), path)
