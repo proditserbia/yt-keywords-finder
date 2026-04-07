@@ -58,6 +58,11 @@ examples:
                 --cookies-file cookies.txt --proxy socks5://127.0.0.1:1080 \\
                 --max-results 5 --min-duration 60 --download
 
+  # Bypass PO-token requirement on headless/data-centre servers (no browser needed)
+  python app.py --mode cli --keywords "documentary" \\
+                --extractor-args "youtube:player_client=tv_embedded" \\
+                --max-results 5 --min-duration 60
+
   python app.py --mode cli --keywords-file keywords.txt \\
                 --max-results 50  --min-duration 3  --output ./results
         """,
@@ -168,6 +173,20 @@ examples:
             "Omit (or leave blank) for a direct connection."
         ),
     )
+    parser.add_argument(
+        "--extractor-args",
+        default=None,
+        metavar="ARGS",
+        dest="extractor_args",
+        help=(
+            "yt-dlp extractor arguments passed verbatim to the downloader, e.g. "
+            "'youtube:player_client=tv_embedded'.  "
+            "Useful on headless / data-centre servers where YouTube blocks the "
+            "default web client and requires a PO token.  The tv_embedded and "
+            "mweb clients often bypass that requirement without cookies.  "
+            "Multiple params: 'youtube:player_client=tv_embedded;skip=webpage'."
+        ),
+    )
 
     # ── Misc ─────────────────────────────────────────────────────────────────
     parser.add_argument(
@@ -248,5 +267,6 @@ def run_cli(args: argparse.Namespace) -> None:
         session=SessionConfig(
             cookies_file=args.cookies_file,
             proxy=args.proxy,
+            extractor_args=args.extractor_args,
         ),
     )
