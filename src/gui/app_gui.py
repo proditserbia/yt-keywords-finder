@@ -34,6 +34,7 @@ from src.config.constants import (
 )
 from src.core.processor import process_keywords
 from src.filters.validators import parse_keywords
+from src.transport.session import SessionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,39 @@ class AppGUI(tk.Tk):
         self._combined_txt_var = tk.BooleanVar(value=True)
         self._make_checkbox(left, "Create CSV summary", self._csv_var)
         self._make_checkbox(left, "Create combined all_keywords.txt", self._combined_txt_var)
+
+        # ── Transport / proxy options ─────────────────────────────────────────
+        self._make_label(left, "Cookies file (Netscape format, optional):")
+        cookies_frame = tk.Frame(left, bg=_BG)
+        cookies_frame.pack(fill=tk.X, padx=10, pady=(0, 2))
+        self._cookies_file_var = tk.StringVar(value="")
+        tk.Entry(
+            cookies_frame,
+            textvariable=self._cookies_file_var,
+            bg=_LOG_BG,
+            fg=_FG,
+            insertbackground=_FG,
+            font=_FONT,
+            relief=tk.FLAT,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        tk.Button(
+            cookies_frame,
+            text="Browse…",
+            command=self._browse_cookies_file,
+            bg=_ACCENT,
+            fg=_BTN_FG,
+            font=_FONT,
+            relief=tk.FLAT,
+            cursor="hand2",
+        ).pack(side=tk.LEFT, padx=(4, 0))
+
+        self._make_label(left, "Proxy URL (optional, e.g. socks5://host:port):")
+        self._proxy_var = tk.StringVar(value="")
+        self._make_entry(left, self._proxy_var)
+
+        self._make_label(left, "Extractor args (optional, e.g. youtube:player_client=tv_embedded):")
+        self._extractor_args_var = tk.StringVar(value="")
+        self._make_entry(left, self._extractor_args_var)
 
         # ── Buttons ──────────────────────────────────────────────────────────
         btn_frame = tk.Frame(left, bg=_BG)
@@ -251,6 +285,14 @@ class AppGUI(tk.Tk):
         if chosen:
             self._output_dir_var.set(chosen)
 
+    def _browse_cookies_file(self) -> None:
+        chosen = filedialog.askopenfilename(
+            title="Select cookies file",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+        )
+        if chosen:
+            self._cookies_file_var.set(chosen)
+
     def _open_output_folder(self) -> None:
         folder = Path(self._output_dir_var.get()).resolve()
         folder.mkdir(parents=True, exist_ok=True)
@@ -305,9 +347,13 @@ class AppGUI(tk.Tk):
         self._status_var.set("Running…")
         self._append_log(f"=== Starting search for {len(keywords)} keyword(s) ===\n")
 
+        cookies_file = self._cookies_file_var.get().strip() or None
+        proxy = self._proxy_var.get().strip() or None
+        extractor_args = self._extractor_args_var.get().strip() or None
+
         self._worker_thread = threading.Thread(
             target=self._worker,
-            args=(keywords, max_results, min_duration, output_dir),
+            args=(keywords, max_results, min_duration, output_dir, cookies_file, proxy, extractor_args),
             daemon=True,
         )
         self._worker_thread.start()
@@ -325,6 +371,9 @@ class AppGUI(tk.Tk):
         max_results: int,
         min_duration: float,
         output_dir: str,
+        cookies_file: Optional[str] = None,
+        proxy: Optional[str] = None,
+        extractor_args: Optional[str] = None,
     ) -> None:
         """Background thread target – calls :func:`process_keywords`."""
         try:
@@ -337,6 +386,11 @@ class AppGUI(tk.Tk):
                 create_combined_txt=self._combined_txt_var.get(),
                 log_callback=lambda msg: self._log_queue.put(msg),
                 cancel_flag=self._cancel_flag,
+                session=SessionConfig(
+                    cookies_file=cookies_file,
+                    proxy=proxy,
+                    extractor_args=extractor_args,
+                ),
             )
         except Exception as exc:
             self._log_queue.put(f"\nFATAL ERROR: {exc}")
