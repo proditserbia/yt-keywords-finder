@@ -16,6 +16,7 @@ import yt_dlp
 
 from src.config.constants import SEARCH_MAX_FETCH, SEARCH_OVERFETCH_MULTIPLIER
 from src.filters.validators import is_valid_duration
+from src.transport.session import SessionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,15 @@ class YouTubeSearchService:
     This service can be replaced by a ``VimeoSearchService`` (or any other
     platform) as long as the replacement exposes the same ``search()`` method
     signature.
+
+    Args:
+        session: Optional :class:`~src.transport.session.SessionConfig`
+            carrying cookies and proxy settings.  ``None`` means no cookies
+            and no proxy (direct connection).
     """
+
+    def __init__(self, session: Optional[SessionConfig] = None) -> None:
+        self._session = session or SessionConfig()
 
     def search(
         self,
@@ -77,12 +86,13 @@ class YouTubeSearchService:
         # Request more results than needed to compensate for filtered-out videos
         fetch_count = min(max_results * SEARCH_OVERFETCH_MULTIPLIER, SEARCH_MAX_FETCH)
 
-        ydl_opts = {
+        ydl_opts: dict = {
             "quiet": True,
             "no_warnings": True,
             "extract_flat": True,   # fast metadata-only extraction
             "ignoreerrors": True,   # skip unavailable/private videos
         }
+        ydl_opts.update(self._session.as_ydl_opts())
 
         search_url = f"ytsearch{fetch_count}:{keyword}"
 

@@ -16,14 +16,19 @@ yt-keywords-finder/
 └── src/
     ├── config/
     │   └── constants.py        # App-wide defaults and constants
+    ├── transport/
+    │   └── session.py          # SessionConfig: cookies + proxy for yt-dlp
+    ├── browser/
+    │   └── fallback.py         # BrowserFallback interface + NullFallback stub
     ├── youtube/
-    │   └── search_service.py   # YouTube search via yt-dlp (platform adapter)
+    │   ├── search_service.py   # YouTube search via yt-dlp (platform adapter)
+    │   └── downloader.py       # yt-dlp video downloader with history tracking
     ├── core/
     │   └── processor.py        # Shared processing logic (keyword loop, output)
     ├── filters/
     │   └── validators.py       # Duration filter, filename sanitizer, etc.
     ├── output/
-    │   └── writer.py           # TXT and CSV file writers
+    │   └── writer.py           # TXT, CSV, and JSON file writers
     ├── gui/
     │   └── app_gui.py          # Tkinter GUI frontend
     └── cli/
@@ -91,14 +96,27 @@ python app.py --mode cli \
               --download \
               --download-dir ./videos
 
-# Search + download with a keywords file
+# Use a cookies file (Netscape format) to bypass IP restrictions
 python app.py --mode cli \
-              --keywords-file keywords.txt \
-              --max-results 10 \
-              --min-duration 60 \
-              --published-within-days 365 \
-              --download \
-              --download-dir ./videos
+              --keywords "documentary nature" \
+              --max-results 5 --min-duration 60 \
+              --cookies-file cookies.txt \
+              --download --download-dir ./videos
+
+# Use a SOCKS5 proxy
+python app.py --mode cli \
+              --keywords "documentary nature" \
+              --max-results 5 --min-duration 60 \
+              --proxy socks5://127.0.0.1:1080 \
+              --download --download-dir ./videos
+
+# Combine cookies + proxy
+python app.py --mode cli \
+              --keywords "documentary nature" \
+              --max-results 5 --min-duration 60 \
+              --cookies-file cookies.txt \
+              --proxy http://proxy-host:8080 \
+              --download --download-dir ./videos
 ```
 
 ### CLI flags
@@ -111,11 +129,13 @@ python app.py --mode cli \
 | `--max-results` | `50` | Max valid URLs per keyword |
 | `--min-duration` | `0` | Min video duration in minutes (0 = no filter) |
 | `--published-within-days` | `None` | Only include videos published within the last N days (e.g. `365`) |
-| `--output` | `./results` | Output directory for URL lists / CSV |
+| `--output` | `./results` | Output directory for URL lists / CSV / JSON |
 | `--no-csv` | off | Disable CSV summary |
 | `--no-combined-txt` | off | Disable `all_keywords.txt` |
 | `--download` | off | Download matching videos after collecting URLs |
 | `--download-dir` | `./downloads` | Root folder for downloads; one sub-folder per keyword |
+| `--cookies-file` | `None` | Path to a Netscape-format `cookies.txt` (passed to yt-dlp) |
+| `--proxy` | `None` | Proxy URL, e.g. `http://host:port` or `socks5://host:port` |
 | `--verbose` | off | DEBUG-level console logging |
 
 ---
@@ -139,11 +159,12 @@ python app.py --mode gui
 
 ## Output Files
 
-For each keyword, one file is created in the output folder:
+For each keyword, files are created in the output folder:
 
 | File | Contents |
 |---|---|
 | `<keyword>.txt` | One video URL per line |
+| `<keyword>.json` | Full metadata per video (title, url, duration, channel, video_id) |
 | `all_keywords.txt` | All URLs from all keywords combined |
 | `all_keywords_summary.csv` | Full metadata: keyword, title, url, duration, channel |
 | `yt_finder.log` | Full debug log |
@@ -159,6 +180,77 @@ downloads/
 
 The `.download_history.json` sidecar is read on every run so that re-running
 the same keyword never re-downloads a video already on disk.
+
+---
+
+## Cookies Support
+
+Export cookies from your browser (e.g. using the
+[Get cookies.txt LOCALLY](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)
+extension) in **Netscape format** and pass the file path via `--cookies-file`:
+
+```bash
+python app.py --mode cli --keywords "documentary" \
+              --cookies-file ~/cookies.txt --min-duration 60 --download
+```
+
+The cookies file path is validated at startup; if the file is not found, the
+app continues without cookies and logs a warning.
+
+---
+
+## Proxy Support
+
+Pass any HTTP/HTTPS or SOCKS proxy URL via `--proxy`:
+
+```bash
+# HTTP proxy
+python app.py --mode cli --keywords "documentary" --proxy http://proxy:8080
+
+# SOCKS5 proxy
+python app.py --mode cli --keywords "documentary" --proxy socks5://127.0.0.1:1080
+```
+
+Proxy settings are routed into both the search (metadata) and download phases
+via `src/transport/session.py`.  To switch between proxies, just change the
+`--proxy` value; no code changes required.
+
+---
+
+## Headless Browser Fallback (Extension Point)
+
+`src/browser/fallback.py` defines a `BrowserFallback` abstract base class and
+a `NullFallback` no-op implementation.  This is an extension point for future
+headless-browser assisted cookie refresh (e.g., via Playwright):
+
+1. Subclass `BrowserFallback` and implement `refresh_cookies()` and
+   `is_available()`.
+2. Pass the instance to `process_keywords(browser_fallback=...)` when needed.
+3. No other files need to change.
+
+Playwright / Chromium are **not** required at runtime – the main app works
+fully with `NullFallback`.
+
+---
+
+## Example Config (JSON) Structure
+
+The following illustrates the configuration values that can be supplied as CLI
+arguments.  A future `--config` option could load this automatically:
+
+```json
+{
+  "keywords": ["documentary nature", "space exploration"],
+  "min_duration_minutes": 60,
+  "published_within_days": 365,
+  "max_results": 10,
+  "output_dir": "./results",
+  "download": true,
+  "download_dir": "./videos",
+  "cookies_file": "./cookies.txt",
+  "proxy": "socks5://127.0.0.1:1080"
+}
+```
 
 ---
 

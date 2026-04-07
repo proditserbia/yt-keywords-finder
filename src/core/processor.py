@@ -34,8 +34,10 @@ from src.output.writer import (
     append_txt,
     ensure_output_dir,
     save_csv,
+    save_json,
     save_txt,
 )
+from src.transport.session import SessionConfig
 from src.youtube.downloader import VideoDownloader
 from src.youtube.search_service import VideoInfo, YouTubeSearchService
 
@@ -87,6 +89,7 @@ def process_keywords(
     download_videos: bool = False,
     download_dir: str = DEFAULT_DOWNLOAD_DIR,
     published_within_days: Optional[int] = None,
+    session: Optional[SessionConfig] = None,
     log_callback: Optional[Callable[[str], None]] = None,
     cancel_flag: Optional[threading.Event] = None,
 ) -> dict[str, list[str]]:
@@ -112,6 +115,9 @@ def process_keywords(
         published_within_days: When set, only videos uploaded within the
             last N days are included in search results.  ``None`` means no
             date filter.
+        session: Optional :class:`~src.transport.session.SessionConfig`
+            holding cookies and proxy settings.  ``None`` uses a default
+            no-cookies, no-proxy config.
         log_callback: Optional function ``(message: str) -> None`` called
             for every log/progress message.  Used by the GUI to update its
             log widget in real time.
@@ -125,7 +131,8 @@ def process_keywords(
     setup_logging(out_dir)
 
     min_duration_seconds = min_duration_minutes * 60.0
-    service = YouTubeSearchService()
+    active_session = session or SessionConfig()
+    service = YouTubeSearchService(session=active_session)
 
     results: dict[str, list[str]] = {}
     csv_rows: list[dict] = []
@@ -144,6 +151,7 @@ def process_keywords(
         f"Starting search for {len(keywords)} keyword(s) → output: {out_dir}"
         + date_note
     )
+    _log(f"Transport: {active_session.describe()}")
 
     for idx, keyword in enumerate(keywords, start=1):
         if cancel_flag and cancel_flag.is_set():
@@ -208,11 +216,31 @@ def process_keywords(
             except OSError as exc:
                 _log(f"  ERROR saving {txt_path}: {exc}")
 
+            # Save per-keyword JSON metadata
+            json_rows = [
+                {
+                    "keyword": keyword,
+                    "title": v.title,
+                    "url": v.url,
+                    "duration_seconds": int(v.duration_seconds),
+                    "duration_human": seconds_to_human(v.duration_seconds),
+                    "channel": v.channel,
+                    "video_id": v.video_id,
+                }
+                for v in video_infos
+            ]
+            json_path = out_dir / f"{safe_name}.json"
+            try:
+                save_json(json_path, json_rows)
+                _log(f"  Saved metadata: {json_path}")
+            except OSError as exc:
+                _log(f"  ERROR saving {json_path}: {exc}")
+
         # ── Download phase for this keyword ──────────────────────────────────
         if download_videos and video_infos:
             safe_name = sanitize_filename(keyword)
             kw_dl_dir = ensure_output_dir(Path(download_dir) / safe_name)
-            downloader = VideoDownloader(kw_dl_dir, log_callback=_log)
+            downloader = VideoDownloader(kw_dl_dir, log_callback=_log, session=active_session)
 
             _log(
                 f"  Downloading {len(video_infos)} video(s) → {kw_dl_dir}"
