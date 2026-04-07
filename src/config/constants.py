@@ -18,6 +18,11 @@ LOG_FILENAME: str = "yt_finder.log"
 SUMMARY_CSV_FILENAME: str = "all_keywords_summary.csv"
 ALL_KEYWORDS_TXT_FILENAME: str = "all_keywords.txt"
 
+# ── Download defaults ──────────────────────────────────────────────────────────
+DEFAULT_DOWNLOAD_DIR: str = "./downloads"
+# JSON sidecar that tracks already-downloaded video IDs per keyword folder.
+DOWNLOAD_HISTORY_FILENAME: str = ".download_history.json"
+
 # ── yt-dlp tuning ─────────────────────────────────────────────────────────────
 # How many results to request from YouTube per search page.
 # We multiply the requested count to compensate for filtered-out short videos.
