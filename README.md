@@ -103,6 +103,12 @@ python app.py --mode cli \
               --cookies-file cookies.txt \
               --download --download-dir ./videos
 
+# Bypass PO-token requirement on headless / data-centre servers (no browser needed)
+python app.py --mode cli \
+              --keywords "documentary nature" \
+              --max-results 5 --min-duration 60 \
+              --extractor-args "youtube:player_client=tv_embedded"
+
 # Use a SOCKS5 proxy
 python app.py --mode cli \
               --keywords "documentary nature" \
@@ -136,6 +142,7 @@ python app.py --mode cli \
 | `--download-dir` | `./downloads` | Root folder for downloads; one sub-folder per keyword |
 | `--cookies-file` | `None` | Path to a Netscape-format `cookies.txt` (passed to yt-dlp) |
 | `--proxy` | `None` | Proxy URL, e.g. `http://host:port` or `socks5://host:port` |
+| `--extractor-args` | `None` | yt-dlp extractor args, e.g. `youtube:player_client=tv_embedded` |
 | `--verbose` | off | DEBUG-level console logging |
 
 ---
@@ -196,6 +203,76 @@ python app.py --mode cli --keywords "documentary" \
 
 The cookies file path is validated at startup; if the file is not found, the
 app continues without cookies and logs a warning.
+
+---
+
+## Headless / CLI-Only Server (No GUI Browser)
+
+If you run on a Linux server without a GUI browser you have three options,
+in order of ease:
+
+### Option 1 – `--extractor-args` (recommended, no cookies needed)
+
+YouTube's default `web` player client requires a PO token that can only be
+obtained from a real browser.  The `tv_embedded` and `mweb` clients bypass
+this check and work fine from data-centre IPs:
+
+```bash
+python app.py --mode cli \
+              --keywords "documentary nature" \
+              --max-results 10 --min-duration 5 \
+              --extractor-args "youtube:player_client=tv_embedded"
+```
+
+Multiple params are separated by `;`:
+
+```bash
+--extractor-args "youtube:player_client=tv_embedded;skip=webpage"
+```
+
+### Option 2 – Generate anonymous cookies without a browser
+
+`tools/fetch_cookies.py` uses Python's standard `urllib` (no extra packages)
+to visit youtube.com and save the visitor cookies it sets:
+
+```bash
+# Writes cookies.txt in the current directory
+python tools/fetch_cookies.py
+
+# Custom output path
+python tools/fetch_cookies.py --output ~/youtube_cookies.txt
+
+# Show each received cookie
+python tools/fetch_cookies.py --verbose
+```
+
+Then pass the file to the app:
+
+```bash
+python app.py --mode cli --keywords "documentary" \
+              --cookies-file cookies.txt --min-duration 60
+```
+
+These are **anonymous** visitor cookies (no Google login).  They satisfy
+YouTube's CONSENT gate and supply a fresh `VISITOR_INFO1_LIVE` value.  For
+heavily restricted data-centre IPs you may still need Option 1 or Option 3.
+
+### Option 3 – Export logged-in cookies from another machine
+
+If you have a desktop/laptop with a browser logged into Google:
+
+1. Install the
+   [Get cookies.txt LOCALLY](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)
+   Chrome extension.
+2. Visit `youtube.com` while logged in, then click the extension → **Export**.
+3. Copy the file to your server:
+   ```bash
+   scp cookies.txt user@your-server:/opt/yt-keywords-finder/cookies.txt
+   ```
+4. Run with `--cookies-file cookies.txt`.
+
+Logged-in cookies are the most effective bypass and typically remain valid for
+several months.  Re-export when they expire.
 
 ---
 
